@@ -16,7 +16,13 @@ function serializePiece(piece) {
  * return list of all ways that chocolate can be split into two pieces.
  * @param {number[][]} piece
  */
+var splitsCache = {};
 function splits(piece) {
+	const serializedPiece = serializePiece(piece);
+	if (splitsCache[serializedPiece]) {
+		return splitsCache[serializedPiece];
+	}
+
 	const rows = piece.length, cols = piece[0].length;
 	const verticalSplits = rows > 1 ?
 		[...Array(rows - 1).keys()].map(idx => [piece.slice(0, idx + 1), piece.slice(idx + 1)]) :
@@ -26,7 +32,7 @@ function splits(piece) {
 			piece.map(row => row.slice(0, idx + 1)), piece.map(row => row.slice(idx + 1))]) :
 		[];
 
-	return verticalSplits.concat(horizontalSplits);
+	return splitsCache[serializedPiece] = verticalSplits.concat(horizontalSplits);
 }
 
 // Test data for splits() method.
@@ -54,8 +60,14 @@ function homogeneous(piece) {
  * pieces with both raisin-squares and non-raisin squares.
  * @param {number[][]} piece
  */
+var splitCache = {};
 function split(piece) {
-	return homogeneous(piece) ?
+	const serializedPiece = serializePiece(piece);
+	if (splitCache[serializedPiece]) {
+		return splitCache[serializedPiece];
+	}
+
+	splitCache[serializedPiece] = homogeneous(piece) ?
 		{
 			piece: piece,
 			numNodes: 1
@@ -70,6 +82,8 @@ function split(piece) {
 				numNodes: aSplit.numNodes + bSplit.numNodes + 1
 			};
 		}).reduce((bestTree, curTree) => curTree.numNodes < bestTree.numNodes ? curTree : bestTree);
+
+	return splitCache[serializedPiece];
 }
 
 /**
@@ -98,8 +112,8 @@ const exampleSplit = split(examplePiece);
 print(exampleSplit);
 
 // Performance test.
-const bigBar =  Array.from({ length: 200 }).map(() =>
-	Array.from({ length: 300 }).map(() => Math.round(Math.random())));
+const bigBar =  Array.from({ length: 10 }).map(() =>
+	Array.from({ length: 20 }).map(() => Math.round(Math.random())));
 var start = new Date();
 const res = split(bigBar);
 var end = new Date();
