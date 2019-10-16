@@ -1,5 +1,14 @@
-const mathjs = require("mathjs");
-
+/**
+ * Given a piece of chocolate represented as (for example) [[0,0,1], [0,1,0], [0,0,0]],
+ * where each 1 represents a square with raisins, and each 0 a square without,
+ * return a String representation like "001\n010\n000" suitable for printing or as a
+ * hash key.
+ *  @param {number[][]} piece
+ *  @returns string
+ */
+function serializePiece(piece) {
+	return piece.map(row => row.join("")).join("\n")
+}
 
 /**
  * Given a piece of chocolate represented as (for example) [[0,0,1], [0,1,0], [0,0,0]],
@@ -7,45 +16,17 @@ const mathjs = require("mathjs");
  * return list of all ways that chocolate can be split into two pieces.
  * @param {number[][]} piece
  */
-function splits (piece) {
+function splits(piece) {
 	const rows = piece.length, cols = piece[0].length;
+	const verticalSplits = rows > 1 ?
+		[...Array(rows - 1).keys()].map(idx => [piece.slice(0, idx + 1), piece.slice(idx + 1)]) :
+		[];
+	const horizontalSplits = cols > 1 ?
+		[...Array(cols - 1).keys()].map(idx => [
+			piece.map(row => row.slice(0, idx + 1)), piece.map(row => row.slice(idx + 1))]) :
+		[];
 
-	if (rows <= 1 && cols <= 1) {
-		throw new TypeError("Piece indivisible");
-	}
-
-	// Convert scalar into double array.  Reverts mathjs.subset() behavior
-	// of returning a scalar when you select a 1x1 subset of a matrix.
-	// See https://www.gitmemory.com/issue/josdejong/mathjs/1484/487436038.
-	function wrap (piece) {
-		return typeof piece === "number" ? [[piece]] : piece;
-	}
-
-	let results = [];
-
-	if (rows > 1) {
-		const verticalSplits = mathjs.range(1, rows).map(idx => [
-			// top
-			wrap(mathjs.subset(piece, mathjs.index(mathjs.range(0, idx), mathjs.range(0, cols)))),
-
-			// bottom
-			wrap(mathjs.subset(piece, mathjs.index(mathjs.range(idx, rows), mathjs.range(0, cols))))
-		]);
-		results = results.concat(verticalSplits._data)
-	}
-
-	if (cols > 1) {
-		const horizontalSplits = mathjs.range(1, cols).map(idx => [
-			// left
-			wrap(mathjs.subset(piece, mathjs.index(mathjs.range(0, rows), mathjs.range(0, idx)))),
-
-			// right
-			wrap(mathjs.subset(piece, mathjs.index(mathjs.range(0, rows), mathjs.range(idx, cols))))
-		]);
-		results = results.concat(horizontalSplits._data)
-	}
-
-	return results;
+	return verticalSplits.concat(horizontalSplits);
 }
 
 // Test data for splits() method.
@@ -62,7 +43,7 @@ const expectedSplits = [
 /**
  * Returns true iff specified piece is all ones or all zeros.
  */
-function isPure (piece) {
+function homogeneous(piece) {
 	return piece.every(row => row.every(val => val === piece[0][0]));
 }
 
@@ -73,38 +54,38 @@ function isPure (piece) {
  * pieces with both raisin-squares and non-raisin squares.
  * @param {number[][]} piece
  */
-function split (piece) {
-	if (isPure(piece)) {
-		return {
+function split(piece) {
+	return homogeneous(piece) ?
+		{
 			piece: piece,
 			numNodes: 1
-		};
-	} else {
+		} :
 		// Loop through each possible split, and pick the one with the lowest cost.
 		// If there's a tie, pick the first one.
-		return splits(piece).reduce((bestSoFar, [a, b]) => {
-			const aSplit = split(a), bSplit = split(b), cost = aSplit.numNodes + bSplit.numNodes;
-			if (!bestSoFar || bestSoFar.numNodes > cost) {
-				return {
-					piece: piece,
-					children: [aSplit, bSplit],
-					numNodes: aSplit.numNodes + bSplit.numNodes + 1
-				};
-			} else {
-				return bestSoFar;
-			}
-		}, null);
-	}
+		splits(piece).map(([a, b]) => {
+			const aSplit = split(a), bSplit = split(b);
+			return {
+				piece: piece,
+				children: [aSplit, bSplit],
+				numNodes: aSplit.numNodes + bSplit.numNodes + 1
+			};
+		}).reduce((bestTree, curTree) => curTree.numNodes < bestTree.numNodes ? curTree : bestTree);
 }
 
-// Spot check that split() works.
-function print (node, prefix) {
+/**
+ * Print a tree returned by split() to the console.
+ * @param node
+ * @param prefix
+ */
+function print(node, prefix) {
 	if (prefix) console.log(prefix ? "\nPiece " + prefix + ":" : "Top piece:");
-	console.log(node.piece.map(row => row.join("")).join("\n"));
+	console.log(serializePiece(node.piece));
 	if (node.children) {
 		node.children.forEach((childPiece, idx) => print(childPiece, (prefix ? prefix + "." : "") + (idx + 1)));
 	}
 }
+
+// Spot check that split() works.
 const examplePiece = [
 	[1, 1, 0, 1],
 	[0, 0, 0, 1],
