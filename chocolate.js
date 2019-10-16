@@ -1,41 +1,25 @@
 /**
- * Given a piece of chocolate represented as (for example) [[0,0,1], [0,1,0], [0,0,0]],
- * where each 1 represents a square with raisins, and each 0 a square without,
- * return a String representation like "001\n010\n000" suitable for printing or as a
- * hash key.
- *  @param {number[][]} piece
- *  @returns string
+ * Return Iterator of all possible sub-slices of the specified slice.
  */
-function serializePiece(piece) {
-	return piece.map(row => row.join("")).join("\n")
-}
-
-/**
- * Given a piece of chocolate represented as (for example) [[0,0,1], [0,1,0], [0,0,0]],
- * where each 1 represents a square with raisins, and each 0 a square without,
- * return list of all ways that chocolate can be split into two pieces.
- * @param {number[][]} piece
- */
-var splitsCache = {};
-function splits(piece) {
-	const serializedPiece = serializePiece(piece);
-	if (splitsCache[serializedPiece]) {
-		return splitsCache[serializedPiece];
+function *splits({x, y, width, height}) {
+	// Vertical splits
+	for (let idx = 1; idx < height; idx++) {
+		yield [
+			{ x: x, y: y, width: width, height: idx },
+			{ x: x, y: y + idx, width: width, height: height - idx},
+		];
 	}
 
-	const rows = piece.length, cols = piece[0].length;
-	const verticalSplits = rows > 1 ?
-		[...Array(rows - 1).keys()].map(idx => [piece.slice(0, idx + 1), piece.slice(idx + 1)]) :
-		[];
-	const horizontalSplits = cols > 1 ?
-		[...Array(cols - 1).keys()].map(idx => [
-			piece.map(row => row.slice(0, idx + 1)), piece.map(row => row.slice(idx + 1))]) :
-		[];
-
-	return splitsCache[serializedPiece] = verticalSplits.concat(horizontalSplits);
+	// Horizontal splits
+	for (let idx = 1; idx < width; idx++) {
+		yield [
+			{ x: x, y: y, width: idx, height: height },
+			{ x: x + idx, y: y, width: width - idx, height: height },
+		];
+	}
 }
 
-// Test data for splits() method.
+// Test data for splits() Iterator.
 const splitsTestData = [[1, 2, 3, 4, 5], [6, 7, 8, 9, 10], [11, 12, 13, 14, 15]];
 const expectedSplits = [
 	[[[1, 2, 3, 4, 5]], [[6, 7, 8, 9, 10], [11, 12, 13, 14, 15]]],
@@ -47,74 +31,106 @@ const expectedSplits = [
 ];
 
 /**
- * Returns true iff specified piece is all ones or all zeros.
- */
-function homogeneous(piece) {
-	return piece.every(row => row.every(val => val === piece[0][0]));
-}
-
-/**
- * Given a piece of chocolate represented as (for example) [[0,0,1], [0,1,0], [0,0,0]],
+ * Given a bar of chocolate represented as (for example) [[0,0,1], [0,1,0], [0,0,0]],
  * where each 1 represents a square with raisins, and each 0 a square without,
  * return a tree of an optimal way to break the chocolate so that there are no
  * pieces with both raisin-squares and non-raisin squares.
- * @param {number[][]} piece
+ * @param {number[][]} bar
  */
-var splitCache = {};
-function split(piece) {
-	const serializedPiece = serializePiece(piece);
-	if (splitCache[serializedPiece]) {
-		return splitCache[serializedPiece];
+function split (bar) {
+	// Returns true iff specified slice is all ones or all zeros.
+	function homogeneous({x, y, width, height}) {
+		var expected = bar[y][x];
+		for (let row = y; row < y + height; row++) {
+			for (let col = x; col < x + width; col++) {
+				if (bar[row][col] !== expected )
+					return false;
+			}
+		}
+
+		return true;
 	}
 
-	splitCache[serializedPiece] = homogeneous(piece) ?
-		{
-			piece: piece,
-			numNodes: 1
-		} :
-		// Loop through each possible split, and pick the one with the lowest cost.
-		// If there's a tie, pick the first one.
-		splits(piece).map(([a, b]) => {
-			const aSplit = split(a), bSplit = split(b);
-			return {
-				piece: piece,
-				children: [aSplit, bSplit],
-				numNodes: aSplit.numNodes + bSplit.numNodes + 1
-			};
-		}).reduce((bestTree, curTree) => curTree.numNodes < bestTree.numNodes ? curTree : bestTree);
+	const memo = {};
+	function splitHelper({x, y, width, height}) {
+		const hash = x + " " + y + " " + width + " " + height;
+		if (memo[hash]) {
+			return memo[hash];
+		}
 
-	return splitCache[serializedPiece];
+		if (homogeneous({x, y, width, height})) {
+			return memo[hash] = {
+				piece: {x, y, width, height},
+				numNodes: 1
+			};
+		} else {
+			let best;
+
+			// Loop through each possible split, and pick the one with the lowest cost.
+			// If there's a tie, pick the first one.
+			for(let [a,b] of splits({x, y, width, height})) {
+				const aSplit = splitHelper(a), bSplit = splitHelper(b);
+				const cost = aSplit.numNodes + bSplit.numNodes + 1;
+				if (!best || best.numNodes > cost) {
+					best = {
+						piece: {x, y, width, height},
+						children: [aSplit, bSplit],
+						numNodes: cost
+					};
+				}
+			}
+
+			return memo[hash] = best;
+		}
+	}
+
+	return splitHelper({x: 0, y: 0, width: bar[0].length, height: bar.length});
 }
 
 /**
- * Print a tree returned by split() to the console.
- * @param node
- * @param prefix
+ * Print the tree returned by split() to the console.
  */
-function print(node, prefix) {
-	if (prefix) console.log(prefix ? "\nPiece " + prefix + ":" : "Top piece:");
-	console.log(serializePiece(node.piece));
-	if (node.children) {
-		node.children.forEach((childPiece, idx) => print(childPiece, (prefix ? prefix + "." : "") + (idx + 1)));
+function print(bar) {
+	// Return string representation of specified slice of the chocolate bar.
+	function stringifyPiece({x, y, width, height}) {
+		let str = "";
+		for (let row = y; row < y + height; row++) {
+			for (let col = x; col < x + width; col++) {
+				str = str + bar[row][col];
+			}
+			str = str + "\n";
+		}
+		return str;
 	}
+
+	// Recursive function
+	function printHelper(node, prefix) {
+		if (prefix) console.log(prefix ? "\nPiece " + prefix + ":" : "Top piece:");
+		console.log(stringifyPiece(node.piece));
+
+		if (node.children) {
+			node.children.forEach((childPiece, idx) => printHelper(childPiece, (prefix ? prefix + "." : "") + (idx + 1)));
+		}
+	}
+
+	const root = split(bar);
+	printHelper(root);
 }
 
-// Spot check that split() works.
-const examplePiece = [
+// Example from homework.
+print([
 	[1, 1, 0, 1],
 	[0, 0, 0, 1],
 	[0, 0, 0, 1],
 	[0, 0, 0, 1],
 	[0, 0, 1, 1],
 	[0, 0, 1, 1]
-];
-const exampleSplit = split(examplePiece);
-print(exampleSplit);
+]);
 
 // Performance test.
-const bigBar =  Array.from({ length: 10 }).map(() =>
-	Array.from({ length: 20 }).map(() => Math.round(Math.random())));
-var start = new Date();
-const res = split(bigBar);
-var end = new Date();
-console.log("ms: ", (end-start));
+const perfTestBar =  Array.from({ length: 20 }).map(() =>
+	Array.from({ length: 30 }).map(() => Math.round(Math.random())));
+const start = new Date();
+const exampleSplit = split(perfTestBar);
+const end = new Date();
+console.log(`Performance test ${perfTestBar[0].length}x${perfTestBar.length}: ${end - start}ms`);
