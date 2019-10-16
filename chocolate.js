@@ -96,3 +96,11 @@ const examplePiece = [
 ];
 const exampleSplit = split(examplePiece);
 print(exampleSplit);
+
+// Performance test.
+const bigBar =  Array.from({ length: 200 }).map(() =>
+	Array.from({ length: 300 }).map(() => Math.round(Math.random())));
+var start = new Date();
+const res = split(bigBar);
+var end = new Date();
+console.log("ms: ", (end-start));
