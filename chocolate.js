@@ -1,26 +1,26 @@
 /**
  * Return Iterator of all possible sub-slices of the specified slice.
  */
-function *splits({x, y, width, height}) {
+function *splits(x, y, width, height) {
 	// Vertical splits
 	for (let idx = 1; idx < height; idx++) {
 		yield [
-			{ x: x, y: y, width: width, height: idx },
-			{ x: x, y: y + idx, width: width, height: height - idx},
+			[x, y, width, idx],
+			[x, y + idx, width, height - idx]
 		];
 	}
 
 	// Horizontal splits
 	for (let idx = 1; idx < width; idx++) {
 		yield [
-			{ x: x, y: y, width: idx, height: height },
-			{ x: x + idx, y: y, width: width - idx, height: height },
+			[x, y, idx, height],
+			[x + idx, y, width - idx, height]
 		];
 	}
 }
 
 // Return a subset of the specified piece (ex: ["0001", "0100"]) based on specified dimensions.
-function slice(bar, {x, y, width, height}) {
+function slice(bar, [x, y, width, height]) {
 	return bar.slice(y, y + height).map(row => row.substring(x, x + width));
 }
 
@@ -49,7 +49,7 @@ function rotate (matrix) {
 let total=0, hits=0;
 function split (bar) {
 	// Returns true iff specified slice is all ones or all zeros.
-	function homogeneous({x, y, width, height}) {
+	function homogeneous(x, y, width, height) {
 		var expected = bar[y][x];
 		for (let row = y; row < y + height; row++) {
 			for (let col = x; col < x + width; col++) {
@@ -65,12 +65,12 @@ function split (bar) {
 
 /*
 	// Save a result.
-	function memoize ({x, y, width, height}, res) {
+	function memoize ([x, y, width, height], res) {
 		// Add entry for this exact slice of the bar.
 		memo[x + " " + y + " " + width + " " + height] = res;
 
 		// Adds 4 entries to hash for each of the four possible rotations.
-		let piece = slice(bar, {x, y, width, height});
+		let piece = slice(bar, [x, y, width, height]);
 		for (let i = 0; i < 4; i++) {
 			memo[piece.join(",")] = res;
 			piece = rotate(piece);
@@ -79,13 +79,13 @@ function split (bar) {
 
 	// Return saved result for the piece at the specified position,
 	// or another identical piece from a different position.
-	function lookup ({x, y, width, height}) {
+	function lookup ([x, y, width, height]) {
 		return memo[x + " " + y + " " + width + " " + height] ||
-			memo[slice(bar, {x, y, width, height}).join(",")];
+			memo[slice(bar, [x, y, width, height]).join(",")];
 	}
 */
 
-	function splitHelper({x, y, width, height}) {
+	function splitHelper(x, y, width, height) {
 		total++;
 		const hash = x + " " + y + " " + width + " " + height;
 		const cached = memo.get(hash);
@@ -95,20 +95,20 @@ function split (bar) {
 		}
 
 		let best;
-		if (homogeneous({x, y, width, height})) {
+		if (homogeneous(x, y, width, height)) {
 			best = {
-				piece: {x, y, width, height},
+				piece: [x, y, width, height],
 				numNodes: 1
 			};
 		} else {
 			// Loop through each possible split, and pick the one with the lowest cost.
 			// If there's a tie, pick the first one.
-			for(let [a,b] of splits({x, y, width, height})) {
-				const aSplit = splitHelper(a), bSplit = splitHelper(b);
+			for(let [a,b] of splits(x, y, width, height)) {
+				const aSplit = splitHelper(...a), bSplit = splitHelper(...b);
 				const cost = aSplit.numNodes + bSplit.numNodes + 1;
 				if (!best || best.numNodes > cost) {
 					best = {
-						piece: {x, y, width, height},
+						piece: [x, y, width, height],
 						children: [aSplit, bSplit],
 						numNodes: cost
 					};
@@ -120,7 +120,7 @@ function split (bar) {
 		return best;
 	}
 
-	return splitHelper({x: 0, y: 0, width: bar[0].length, height: bar.length});
+	return splitHelper(0, 0, bar[0].length, bar.length);
 }
 
 /**
