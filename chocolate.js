@@ -61,7 +61,7 @@ function split (bar) {
 		return true;
 	}
 
-	const memo = {};
+	const memo = new Map();
 
 /*
 	// Save a result.
@@ -88,9 +88,10 @@ function split (bar) {
 	function splitHelper({x, y, width, height}) {
 		total++;
 		const hash = x + " " + y + " " + width + " " + height;
-		if (memo[hash]) {
+		const cached = memo.get(hash);
+		if (cached) {
 			hits++;
-			return memo[hash];
+			return cached;
 		}
 
 		let best;
@@ -115,7 +116,8 @@ function split (bar) {
 			}
 		}
 
-		return memo[hash] = best;
+		memo.set(hash, best);
+		return best;
 	}
 
 	return splitHelper({x: 0, y: 0, width: bar[0].length, height: bar.length});
@@ -150,8 +152,8 @@ print([
 ]);
 
 // Performance test.
-const perfTestBar =  Array.from({ length: 20 }).map(() =>
-	Array.from({ length: 30 }).map(() => Math.round(Math.random())).join(""));
+const perfTestBar =  Array.from({ length: 50 }).map(() =>
+	Array.from({ length: 50 }).map(() => Math.round(Math.random())).join(""));
 const start = new Date();
 const exampleSplit = split(perfTestBar);
 const end = new Date();
