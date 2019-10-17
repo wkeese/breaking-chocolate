@@ -19,16 +19,25 @@ function *splits({x, y, width, height}) {
 	}
 }
 
-// Test data for splits() Iterator.
-const splitsTestData = [[1, 2, 3, 4, 5], [6, 7, 8, 9, 10], [11, 12, 13, 14, 15]];
-const expectedSplits = [
-	[[[1, 2, 3, 4, 5]], [[6, 7, 8, 9, 10], [11, 12, 13, 14, 15]]],
-	[[[1, 2, 3, 4, 5], [6, 7, 8, 9, 10]], [[11, 12, 13, 14, 15]]],
-	[[[1], [6], [11]], [[2, 3, 4, 5], [7, 8, 9, 10], [12, 13, 14, 15]]],
-	[[[1, 2], [6, 7], [11, 12]], [[3, 4, 5], [8, 9, 10], [13, 14, 15]]],
-	[[[1, 2, 3], [6, 7, 8], [11, 12, 13]], [[4, 5], [9, 10], [14, 15]]],
-	[[[1, 2, 3, 4], [6, 7, 8, 9], [11, 12, 13, 14]], [[5], [10], [15]]]
-];
+// Return a subset of the specified piece (ex: ["0001", "0100"]) based on specified dimensions.
+function slice(bar, {x, y, width, height}) {
+	return bar.slice(y, y + height).map(row => row.substring(x, x + width));
+}
+
+/**
+ * Rotate a matrix 90 degrees to the right.
+ * @param {String[]} - matrix
+ * @returns {String[]}
+ */
+function rotate (matrix) {
+	const width = matrix[0].length;
+	const ret = [];
+	for (let col = 0; col < width; col++) {
+		ret.push(matrix.map(row => row.substring(col, col + 1)).reverse().join(""))
+	}
+	return ret;
+}
+
 
 /**
  * Given a bar of chocolate represented as (for example) [[0,0,1], [0,1,0], [0,0,0]],
@@ -37,6 +46,7 @@ const expectedSplits = [
  * pieces with both raisin-squares and non-raisin squares.
  * @param {number[][]} bar
  */
+let total=0, hits=0;
 function split (bar) {
 	// Returns true iff specified slice is all ones or all zeros.
 	function homogeneous({x, y, width, height}) {
@@ -52,20 +62,44 @@ function split (bar) {
 	}
 
 	const memo = {};
+
+/*
+	// Save a result.
+	function memoize ({x, y, width, height}, res) {
+		// Add entry for this exact slice of the bar.
+		memo[x + " " + y + " " + width + " " + height] = res;
+
+		// Adds 4 entries to hash for each of the four possible rotations.
+		let piece = slice(bar, {x, y, width, height});
+		for (let i = 0; i < 4; i++) {
+			memo[piece.join(",")] = res;
+			piece = rotate(piece);
+		}
+	}
+
+	// Return saved result for the piece at the specified position,
+	// or another identical piece from a different position.
+	function lookup ({x, y, width, height}) {
+		return memo[x + " " + y + " " + width + " " + height] ||
+			memo[slice(bar, {x, y, width, height}).join(",")];
+	}
+*/
+
 	function splitHelper({x, y, width, height}) {
+		total++;
 		const hash = x + " " + y + " " + width + " " + height;
 		if (memo[hash]) {
+			hits++;
 			return memo[hash];
 		}
 
+		let best;
 		if (homogeneous({x, y, width, height})) {
-			return memo[hash] = {
+			best = {
 				piece: {x, y, width, height},
 				numNodes: 1
 			};
 		} else {
-			let best;
-
 			// Loop through each possible split, and pick the one with the lowest cost.
 			// If there's a tie, pick the first one.
 			for(let [a,b] of splits({x, y, width, height})) {
@@ -79,9 +113,9 @@ function split (bar) {
 					};
 				}
 			}
-
-			return memo[hash] = best;
 		}
+
+		return memo[hash] = best;
 	}
 
 	return splitHelper({x: 0, y: 0, width: bar[0].length, height: bar.length});
@@ -91,22 +125,10 @@ function split (bar) {
  * Print the tree returned by split() to the console.
  */
 function print(bar) {
-	// Return string representation of specified slice of the chocolate bar.
-	function stringifyPiece({x, y, width, height}) {
-		let str = "";
-		for (let row = y; row < y + height; row++) {
-			for (let col = x; col < x + width; col++) {
-				str = str + bar[row][col];
-			}
-			str = str + "\n";
-		}
-		return str;
-	}
-
 	// Recursive function
 	function printHelper(node, prefix) {
 		if (prefix) console.log(prefix ? "\nPiece " + prefix + ":" : "Top piece:");
-		console.log(stringifyPiece(node.piece));
+		console.log(slice(bar, node.piece).join("\n"));
 
 		if (node.children) {
 			node.children.forEach((childPiece, idx) => printHelper(childPiece, (prefix ? prefix + "." : "") + (idx + 1)));
@@ -119,18 +141,19 @@ function print(bar) {
 
 // Example from homework.
 print([
-	[1, 1, 0, 1],
-	[0, 0, 0, 1],
-	[0, 0, 0, 1],
-	[0, 0, 0, 1],
-	[0, 0, 1, 1],
-	[0, 0, 1, 1]
+	"1101",
+	"0001",
+	"0001",
+	"0001",
+	"0011",
+	"0011"
 ]);
 
 // Performance test.
 const perfTestBar =  Array.from({ length: 20 }).map(() =>
-	Array.from({ length: 30 }).map(() => Math.round(Math.random())));
+	Array.from({ length: 30 }).map(() => Math.round(Math.random())).join(""));
 const start = new Date();
 const exampleSplit = split(perfTestBar);
 const end = new Date();
 console.log(`Performance test ${perfTestBar[0].length}x${perfTestBar.length}: ${end - start}ms`);
+console.log(hits, " cache hits out of ", total, "split() calls", total - hits, "misses")
