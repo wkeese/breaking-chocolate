@@ -1,23 +1,3 @@
-/**
- * Return Iterator of all possible sub-slices of the specified slice.
- */
-function *splits(x, y, width, height) {
-	// Vertical splits
-	for (let idx = 1; idx < height; idx++) {
-		yield [
-			[x, y, width, idx],
-			[x, y + idx, width, height - idx]
-		];
-	}
-
-	// Horizontal splits
-	for (let idx = 1; idx < width; idx++) {
-		yield [
-			[x, y, idx, height],
-			[x + idx, y, width - idx, height]
-		];
-	}
-}
 
 // Return a subset of the specified piece (ex: ["0001", "0100"]) based on specified dimensions.
 function slice(bar, [x, y, width, height]) {
@@ -48,6 +28,8 @@ function rotate (matrix) {
  */
 let total=0, hits=0;
 function split (bar) {
+	const barNestedArray = bar.map(str => Array.from(str));
+
 	// Returns true iff specified slice is all ones or all zeros.
 	function homogeneous(x, y, width, height) {
 		const expected = bar[y][x];
@@ -59,6 +41,37 @@ function split (bar) {
 		}
 
 		return true;
+	}
+
+	// Return Iterator of all useful sub-slices of the specified slice.
+	function *splits(x, y, width, height) {
+		// Horizontal splits
+		for (let yDelta = 1; yDelta < height; yDelta++) {
+			// If these two rows don't have any cells that differ from each other, then skip.
+			for (let x1 = x; x1 < x + width; x1++) {
+				if (bar[y + yDelta - 1][x1] !== bar[y + yDelta][x1]) {
+					yield [
+						[x, y, width, yDelta],
+						[x, y + yDelta, width, height - yDelta]
+					];
+					break;
+				}
+			}
+		}
+
+		// Vertical splits
+		for (let xDelta = 1; xDelta < width; xDelta++) {
+			// If these two columns don't have any cells that differ from each other, then skip.
+			for (let y1 = y; y1 < y + height; y1++) {
+				if (bar[y1][x + xDelta - 1] !== bar[y1][x + xDelta]) {
+					yield [
+						[x, y, xDelta, height],
+						[x + xDelta, y, width - xDelta, height]
+					];
+					break;
+				}
+			}
+		}
 	}
 
 	const memo = new Map();
@@ -147,8 +160,11 @@ print([
 ]);
 
 // Performance test.
-const perfTestBar =  Array.from({ length: 50 }).map(() =>
-	Array.from({ length: 50 }).map(() => Math.round(Math.random())).join(""));
+function raisin (x, y) {
+	return [[3, 4], [3, 5], [7, 6], [8, 6], [9, 6], [100, 101], [101, 101], [100, 102], [101, 102], [234, 345]].some(([x1, y1]) => x1 === x && y1 === y) ? "1" : "0";
+}
+const perfTestBar =  Array.from({ length: 300 }).map((val, y) =>
+	Array.from({ length: 400 }).map((val, x) => raisin(x, y)).join(""));
 
 console.log(`\n\nPerformance test on ${perfTestBar[0].length}x${perfTestBar.length} bar:`);
 console.log(perfTestBar.join("\n"));
