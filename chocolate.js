@@ -104,6 +104,17 @@ class Grid {
 			// from the cache.
 			let best;
 			for (let [a, b] of this.splits()) {
+				// Don't emit if it couldn't possibly lead to a tree better than
+				// one we've already found.
+				var bCached = memo.get(b);
+				if (bCached) {
+					const minimumTotalBreaks = bCached.numNodes + 1 + depth * 2;
+					if (minimumTotalBreaks >= bestSoFar) {
+						console.log("pruning just on basis of b cached, minimumTotalBreaks = ", minimumTotalBreaks, ", but bestSoFar = ", bestSoFar);
+						continue;
+					}
+				}
+
 				for(let aSplit of a.splitHelper(depth + 1)) {
 					// Don't emit if it couldn't possibly lead to a tree better than
 					// one we've already found.
