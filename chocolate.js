@@ -8,19 +8,17 @@ class Grid {
 	/**
 	 * Construct grid as subset of specified array of strings.
 	 * @param {String[]} data
-	 * @param {number} x
-	 * @param {number} y
-	 * @param {number} width
-	 * @param {number} height
+	 * @param {number} startX
+	 * @param {number} startY
+	 * @param {number} endX
+	 * @param {number} endY
 	 */
-	constructor(data, x, y, width, height) {
+	constructor(data, startX, startY, endX, endY) {
 		this.bar = data;
-		this.startX = x || 0;
-		this.startY = y || 0;
-		this.width = width || data[0].length;
-		this.height = height || data.length;
-		this.endX = this.startX + this.width;
-		this.endY = this.startY + this.height;
+		this.startX = startX || 0;
+		this.startY = startY || 0;
+		this.endX = endX || data[0].length;
+		this.endY = endY || data.length
 	}
 
 	/**
@@ -46,13 +44,13 @@ class Grid {
 	// Return Iterator of all useful slices
 	*splits() {
 		// Horizontal splits
-		for (let yDelta = 1; yDelta < this.height; yDelta++) {
+		for (let y = this.startY + 1; y < this.endY; y++) {
 			// If these two rows don't have any cells that differ from each other, then skip.
 			for (let x = this.startX; x < this.endX; x++) {
-				if (this.bar[this.startY + yDelta - 1][x] !== this.bar[this.startY + yDelta][x]) {
+				if (this.bar[y - 1][x] !== this.bar[y][x]) {
 					yield [
-						new Grid(this.bar, this.startX, this.startY, this.width, yDelta),
-						new Grid(this.bar, this.startX, this.startY + yDelta, this.width, this.height - yDelta)
+						new Grid(this.bar, this.startX, this.startY, this.endX, y),
+						new Grid(this.bar, this.startX, y, this.endX, this.endY)
 					];
 					break;
 				}
@@ -60,13 +58,13 @@ class Grid {
 		}
 
 		// Vertical splits
-		for (let xDelta = 1; xDelta < this.width; xDelta++) {
+		for (let x = this.startX + 1; x < this.endX; x++) {
 			// If these two columns don't have any cells that differ from each other, then skip.
 			for (let y = this.startY; y < this.endY; y++) {
-				if (this.bar[y][this.startX + xDelta - 1] !== this.bar[y][this.startX + xDelta]) {
+				if (this.bar[y][x - 1] !== this.bar[y][x]) {
 					yield [
-						new Grid(this.bar, this.startX, this.startY, xDelta, this.height),
-						new Grid(this.bar, this.startX + xDelta, this.startY, this.width - xDelta, this.height)
+						new Grid(this.bar, this.startX, this.startY, x, this.endY),
+						new Grid(this.bar, x, this.startY, this.endX, this.endY)
 					];
 					break;
 				}
@@ -75,7 +73,7 @@ class Grid {
 	}
 
 	hash (){
-		return this.startX + " " + this.startY + " " + this.width + " " + this.height;
+		return this.startX + " " + this.startY + " " + this.endX + " " + this.endY;
 	}
 
 	/**
