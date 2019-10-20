@@ -1,7 +1,136 @@
+let total=0, hits=0;
+const memo = new Map();
 
-// Return a subset of the specified piece (ex: ["0001", "0100"]) based on specified dimensions.
-function slice(bar, [x, y, width, height]) {
-	return bar.slice(y, y + height).map(row => row.substring(x, x + width));
+/**
+ * A piece of chocolate.
+ */
+class Grid {
+	/**
+	 * Construct grid as subset of specified array of strings.
+	 * @param {String[]} data
+	 * @param {number} x
+	 * @param {number} y
+	 * @param {number} width
+	 * @param {number} height
+	 */
+	constructor(data, x, y, width, height) {
+		this.bar = data;
+		this.startX = x || 0;
+		this.startY = y || 0;
+		this.width = width || data[0].length;
+		this.height = height || data.length;
+		this.endX = this.startX + this.width;
+		this.endY = this.startY + this.height;
+	}
+
+	/**
+	 * 	Returns true if all ones or all zeros.
+	 */
+	homogeneous() {
+		const expected = this.bar[this.startY][this.startX];
+
+		for (let row = this.startY; row < this.endY; row++) {
+			for (let col = this.startX; col < this.endX; col++) {
+				if (this.bar[row][col] !== expected )
+					return false;
+			}
+		}
+
+		return true;
+	}
+
+	toString() {
+		return this.bar.slice(this.startY, this.endY).map(row => row.substring(this.startX, this.endX)).join("\n");
+	}
+
+	// Return Iterator of all useful slices
+	*splits() {
+		// Horizontal splits
+		for (let yDelta = 1; yDelta < this.height; yDelta++) {
+			// If these two rows don't have any cells that differ from each other, then skip.
+			for (let x = this.startX; x < this.endX; x++) {
+				if (this.bar[this.startY + yDelta - 1][x] !== this.bar[this.startY + yDelta][x]) {
+					yield [
+						new Grid(this.bar, this.startX, this.startY, this.width, yDelta),
+						new Grid(this.bar, this.startX, this.startY + yDelta, this.width, this.height - yDelta)
+					];
+					break;
+				}
+			}
+		}
+
+		// Vertical splits
+		for (let xDelta = 1; xDelta < this.width; xDelta++) {
+			// If these two columns don't have any cells that differ from each other, then skip.
+			for (let y = this.startY; y < this.endY; y++) {
+				if (this.bar[y][this.startX + xDelta - 1] !== this.bar[y][this.startX + xDelta]) {
+					yield [
+						new Grid(this.bar, this.startX, this.startY, xDelta, this.height),
+						new Grid(this.bar, this.startX + xDelta, this.startY, this.width - xDelta, this.height)
+					];
+					break;
+				}
+			}
+		}
+	}
+
+	hash (){
+		return this.startX + " " + this.startY + " " + this.width + " " + this.height;
+	}
+
+	/**
+	 * Return a tree of an optimal way to break the chocolate so that there are no
+	 * pieces with both raisin-squares and non-raisin squares.
+	 * @returns Tree
+	 */
+	split() {
+		total++;
+
+		const hash = this.hash();
+		const cached = memo.get(hash);
+		if (cached) {
+			hits++;
+			return cached;
+		}
+
+		let best;
+		if (this.homogeneous()) {
+			best = new Tree(this);
+		} else {
+			// Loop through each possible split, and pick the one with the lowest cost.
+			// If there's a tie, pick the first one.
+			for(let [a,b] of this.splits()) {
+				const aSplit = a.split(), bSplit = b.split();
+				const cost = aSplit.numNodes + bSplit.numNodes + 1;
+				if (!best || best.numNodes > cost) {
+					best = new Tree(this, [aSplit, bSplit]);
+				}
+			}
+		}
+
+		memo.set(hash, best);
+		return best;
+	}
+}
+
+/**
+ * A tree of Grids showing how to split them into homogeneous pieces.
+ */
+class Tree {
+	constructor(piece, children) {
+		this.piece = piece;
+		this.children = children;
+		this.numNodes = children ? children[0].numNodes + children[1].numNodes + 1 : 1
+	}
+
+	print(prefix) {
+		console.log(prefix ? "\nPiece " + prefix + ":" : "Top piece:");
+		console.log(this.piece.toString());
+
+		if (this.children) {
+			this.children.forEach((childPiece, idx) => childPiece.print((prefix ? prefix + "." : "") + (idx + 1)));
+		}
+	}
 }
 
 /**
@@ -18,139 +147,25 @@ function rotate (matrix) {
 	return ret;
 }
 
-
-/**
- * Given a bar of chocolate represented as (for example) ["001", "010", "000"],
- * where each 1 represents a square with raisins, and each 0 a square without,
- * return a tree of an optimal way to break the chocolate so that there are no
- * pieces with both raisin-squares and non-raisin squares.
- * @param {number[][]} bar
- */
-let total=0, hits=0;
-function split (bar) {
-	const barNestedArray = bar.map(str => Array.from(str));
-
-	// Returns true iff specified slice is all ones or all zeros.
-	function homogeneous(x, y, width, height) {
-		const expected = bar[y][x];
-		for (let row = y; row < y + height; row++) {
-			for (let col = x; col < x + width; col++) {
-				if (bar[row][col] !== expected )
-					return false;
-			}
-		}
-
-		return true;
-	}
-
-	// Return Iterator of all useful sub-slices of the specified slice.
-	function *splits(x, y, width, height) {
-		// Horizontal splits
-		for (let yDelta = 1; yDelta < height; yDelta++) {
-			// If these two rows don't have any cells that differ from each other, then skip.
-			for (let x1 = x; x1 < x + width; x1++) {
-				if (bar[y + yDelta - 1][x1] !== bar[y + yDelta][x1]) {
-					yield [
-						[x, y, width, yDelta],
-						[x, y + yDelta, width, height - yDelta]
-					];
-					break;
-				}
-			}
-		}
-
-		// Vertical splits
-		for (let xDelta = 1; xDelta < width; xDelta++) {
-			// If these two columns don't have any cells that differ from each other, then skip.
-			for (let y1 = y; y1 < y + height; y1++) {
-				if (bar[y1][x + xDelta - 1] !== bar[y1][x + xDelta]) {
-					yield [
-						[x, y, xDelta, height],
-						[x + xDelta, y, width - xDelta, height]
-					];
-					break;
-				}
-			}
-		}
-	}
-
-	const memo = new Map();
-
 /*
-	// Memoization functions to do maximum possible matches.
-	function memoize (x, y, width, height, res) {
-		// Adds 4 entries to hash, one for each of the four rotations.
-		let piece = slice(bar, [x, y, width, height]);
-		for (let i = 0; i < 4; i++) {
-			memo[piece.join(",")] = res;
-			piece = rotate(piece);
-		}
+// Memoization functions to do maximum possible matches.
+function memoize (startX, startY, width, height, res) {
+	// Adds 4 entries to hash, one for each of the four rotations.
+	let piece = slice(bar, [startX, startY, width, height]);
+	for (let i = 0; i < 4; i++) {
+		memo[piece.join(",")] = res;
+		piece = rotate(piece);
 	}
+}
 
-	function lookup (x, y, width, height) {
-		return memo[slice(bar, [x, y, width, height]).join(",")];
-	}
+function lookup (startX, startY, width, height) {
+	return memo[slice(bar, [startX, startY, width, height]).join(",")];
+}
 */
-
-	function splitHelper(x, y, width, height) {
-		total++;
-		const hash = x + " " + y + " " + width + " " + height;
-		const cached = memo.get(hash);
-		if (cached) {
-			hits++;
-			return cached;
-		}
-
-		let best;
-		if (homogeneous(x, y, width, height)) {
-			best = {
-				piece: [x, y, width, height],
-				numNodes: 1
-			};
-		} else {
-			// Loop through each possible split, and pick the one with the lowest cost.
-			// If there's a tie, pick the first one.
-			for(let [a,b] of splits(x, y, width, height)) {
-				const aSplit = splitHelper(...a), bSplit = splitHelper(...b);
-				const cost = aSplit.numNodes + bSplit.numNodes + 1;
-				if (!best || best.numNodes > cost) {
-					best = {
-						piece: [x, y, width, height],
-						children: [aSplit, bSplit],
-						numNodes: cost
-					};
-				}
-			}
-		}
-
-		memo.set(hash, best);
-		return best;
-	}
-
-	return splitHelper(0, 0, bar[0].length, bar.length);
-}
-
-/**
- * Print the tree returned by split() to the console.
- */
-function print(bar) {
-	// Recursive function
-	function printHelper(node, prefix) {
-		if (prefix) console.log(prefix ? "\nPiece " + prefix + ":" : "Top piece:");
-		console.log(slice(bar, node.piece).join("\n"));
-
-		if (node.children) {
-			node.children.forEach((childPiece, idx) => printHelper(childPiece, (prefix ? prefix + "." : "") + (idx + 1)));
-		}
-	}
-
-	const root = split(bar);
-	printHelper(root);
-}
 
 // Test example from homework.
 console.log("Homework example (and result):");
-print([
+const homeworkGrid = new Grid([
 	"1101",
 	"0001",
 	"0001",
@@ -158,21 +173,30 @@ print([
 	"0011",
 	"0011"
 ]);
+const homeworkTree = homeworkGrid.split();
+homeworkTree.print();
 
 // Performance test.
-function raisin (x, y) {
-	return [[3, 4], [3, 5], [7, 6], [8, 6], [9, 6], [100, 101], [101, 101], [100, 102], [101, 102], [234, 345]].some(([x1, y1]) => x1 === x && y1 === y) ? "1" : "0";
-}
-const perfTestBar =  Array.from({ length: 300 }).map((val, y) =>
-	Array.from({ length: 400 }).map((val, x) => raisin(x, y)).join(""));
+const perfTestBar =  Array.from({ length: 50 }).map(() =>
+	Array.from({ length: 50 }).map(() => Math.round(Math.random())).join(""));
+
 
 console.log(`\n\nPerformance test on ${perfTestBar[0].length}x${perfTestBar.length} bar:`);
 console.log(perfTestBar.join("\n"));
 
 const start = new Date();
-const exampleSplit = split(perfTestBar);
+const bar = new Grid(perfTestBar);
+const exampleSplit = bar.split();
 const end = new Date();
 console.log(`${end - start}ms`);
+
+// Sparse bar (not many raisins).
+function raisin (x, y) {
+	return [[3, 4], [3, 5], [7, 6], [8, 6], [9, 6], [100, 101], [101, 101], [100, 102], [101, 102], [234, 345]].some(([x1, y1]) => x1 === x && y1 === y) ? "1" : "0";
+}
+const sparseTestBar =  Array.from({ length: 300 }).map((val, y) =>
+	Array.from({ length: 400 }).map((val, x) => raisin(x, y)).join(""));
+
 
 // Print stats on memoization.
 console.log(hits, " cache hits out of ", total, "split() calls", total - hits, "misses");
