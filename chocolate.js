@@ -1,6 +1,8 @@
 let total=0, hits=0;
 const memo = new Map();
 
+let bestSoFar = Infinity;
+
 /**
  * A piece of chocolate.
  */
@@ -29,7 +31,7 @@ class Grid {
 
 		for (let row = this.startY; row < this.endY; row++) {
 			for (let col = this.startX; col < this.endX; col++) {
-				if (this.bar[row][col] !== expected )
+				if (this.bar[row][col] !== expected)
 					return false;
 			}
 		}
@@ -72,8 +74,69 @@ class Grid {
 		}
 	}
 
-	hash (){
+	hash() {
 		return this.startX + " " + this.startY + " " + this.endX + " " + this.endY;
+	}
+
+	/**
+	 * Return an Iterator of solution trees.
+	 * @returns *Tree
+	 */
+	*splitHelper(depth = 0) {
+		total++;
+
+		const hash = this.hash();
+		const cached = memo.get(hash);
+		if (cached) {
+			hits++;
+			yield cached;
+			return;
+		}
+
+		if (this.homogeneous()) {
+			const tree = new Tree(this);
+			memo.set(hash, tree);
+			yield tree;
+		} else {
+			// Loop through all combinations of splits.  Emit them all but only memoize the best one.
+			// It looks like O(n^2) but I think it's O(n) because the second (and subsequent) times
+			// that b.splitHelper(depth + 1) is called, it just returns a single value sequence,
+			// from the cache.
+			let best;
+			for (let [a, b] of this.splits()) {
+				for(let aSplit of a.splitHelper(depth + 1)) {
+					// Don't emit if it couldn't possibly lead to a tree better than
+					// one we've already found.
+					const minimumTotalBreaks = aSplit.numNodes + 1 + depth * 2;
+					if (minimumTotalBreaks >= bestSoFar) {
+						console.log("pruning just on basis of aSplit, minimumTotalBreaks = ", minimumTotalBreaks, ", but bestSoFar = ", bestSoFar);
+						continue;
+					}
+
+					for (let bSplit of b.splitHelper(depth + 1)) {
+						const tree = new Tree(this, [aSplit, bSplit]);
+						if (!best|| tree.numNodes < best.numNodes) {
+							best = tree;
+						}
+
+						// Don't emit if it couldn't possibly lead to a tree better than
+						// one we've already found.
+						const minimumTotalBreaks = tree.numNodes + depth * 2;
+						if (minimumTotalBreaks >= bestSoFar) {
+							console.log("prune, minimumTotalBreaks = ", minimumTotalBreaks, ", but bestSoFar = ", bestSoFar);
+							continue;
+						}
+
+						if (tree === best) {
+							// Not necessarily the best, but it's the best so far.
+							yield tree;
+						}
+					}
+				}
+			}
+
+			memo.set(hash, best);
+		}
 	}
 
 	/**
@@ -82,31 +145,15 @@ class Grid {
 	 * @returns Tree
 	 */
 	split() {
-		total++;
-
-		const hash = this.hash();
-		const cached = memo.get(hash);
-		if (cached) {
-			hits++;
-			return cached;
-		}
-
+		bestSoFar = Infinity;
 		let best;
-		if (this.homogeneous()) {
-			best = new Tree(this);
-		} else {
-			// Loop through each possible split, and pick the one with the lowest cost.
-			// If there's a tie, pick the first one.
-			for(let [a,b] of this.splits()) {
-				const aSplit = a.split(), bSplit = b.split();
-				const cost = aSplit.numNodes + bSplit.numNodes + 1;
-				if (!best || best.numNodes > cost) {
-					best = new Tree(this, [aSplit, bSplit]);
-				}
+		for (let tree of this.splitHelper()) {
+			if (!best || best.numNodes > tree.numNodes) {
+				best = tree;
+				bestSoFar = tree.numNodes;
+				console.log("best so far: ", bestSoFar);
 			}
 		}
-
-		memo.set(hash, best);
 		return best;
 	}
 }
